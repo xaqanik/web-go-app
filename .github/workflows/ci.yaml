@@ -42,21 +42,4 @@ jobs:
        username: ${{ secrets.DOCKER_USERNAME }}
        password: ${{ secrets.DOCKER_TOKEN }}
 
-    # 🐳 Build & push Docker image using official action
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v6
-      with:
-        context: .
-        file: ./Dockerfile
-        push: true
-        tags: ${{ secrets.DOCKER_USERNAME }}/go-web-app:${{ github.sha }}
-
-    # 📝 Update Helm values.yaml with new image tag and push back to GitHub
-    - name: Update Helm tag and commit
-      run: |
-        sed -i "s/^  tag: .*/  tag: \"${{ github.sha }}\"/" helm/values.yaml
-        git config user.name "ci-bot"
-        git config user.email "ci-bot@example.com"
-        git add helm/values.yaml
-        git commit -m "Update image tag to ${{ github.sha }}" || echo "No changes to commit"
-        git push
+    
