@@ -22,7 +22,6 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Set up Go 1.22
-      # ✅ FIXED: Updated to the latest version of the setup-go action
       uses: actions/setup-go@v5
       with:
         go-version: 1.22
@@ -39,13 +38,11 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # ✅ FIXED: Added Go setup to this job to ensure the environment is correct.
     - name: Set up Go 1.22
       uses: actions/setup-go@v5
       with:
         go-version: 1.22
 
-    # ✅ FIXED: Added a step to clean the Go module cache, which resolves the stubborn linter error.
     - name: Clean Go module cache
       run: go clean -modcache
 
@@ -53,18 +50,16 @@ jobs:
       uses: golangci/golangci-lint-action@v6
       with:
         version: v1.59.1
-        # No longer need to skip cache here, as cleaning the modcache is more effective.
+       
   
   push:
     runs-on: ubuntu-latest
-    # ✅ FIXED: This job now correctly depends on both build and code-quality passing.
     needs: [build, code-quality]
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
     - name: Set up Docker Buildx
-      # ✅ FIXED: Updated to the latest version of the setup-buildx-action
       uses: docker/setup-buildx-action@v3
 
     - name: Login to DockerHub
@@ -96,9 +91,8 @@ jobs:
 
     - name: Commit and push changes
       run: |
-        git config --global user.email "abhishek@gmail.com"
-        git config --global user.name "Abhishek Veeramalla"
+        git config --global user.email "xaqanik.1990@gmail.com"
+        git config --global user.name "Khagani Atakishiyev
         git add helm/go-web-app-chart/values.yaml
-        # ✅ FIXED: Added [skip ci] to prevent this commit from triggering the workflow again.
         git commit -m "Update image tag to ${{github.run_id}} [skip ci]"
         git push
