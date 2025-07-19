@@ -3,36 +3,40 @@
 # and run the container
 
 # Start with a base image
-FROM golang:1.22.5 as base
+FROM golang:1.22.5 as builder
 
 # Set the working directory inside the container
 WORKDIR /app
 
-# Copy the go.mod and go.sum files to the working directory
+# Copy the go.mod and go.sum files to the working directory and download dependencies
 COPY go.mod ./
-
-# Download all the dependencies
 RUN go mod download
 
 # Copy the source code to the working directory
 COPY . .
 
 # Build the application
-RUN go build -o main .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
 
 #######################################################
 # Reduce the image size using multi-stage builds
 # We will use a distroless image to run the application
-FROM gcr.io/distroless/base
+FROM gcr.io/distroless/static-debian11
+
+# Set the working directory
+WORKDIR /
+
+# Create a non-root user
+USER nonroot:nonroot
 
 # Copy the binary from the previous stage
-COPY --from=base /app/main .
+COPY --from=builder /app/main .
 
 # Copy the static files from the previous stage
-COPY --from=base /app/static ./static
+COPY --from=builder /app/static ./static
 
 # Expose the port on which the application will run
 EXPOSE 8080
 
 # Command to run the application
-CMD ["./main"]
+CMD ["/main"]

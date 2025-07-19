@@ -1,0 +1,10 @@
+# Ignore git files
+.git
+.gitignore
+
+# Ignore documentation
+README.md
+LICENSE
+
+# Ignore other artifacts
+*.log
