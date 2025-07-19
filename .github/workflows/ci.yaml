@@ -1,63 +1,92 @@
-name: Go Web App CI Pipeline
+# CICD using GitHub actions
 
+name: CI/CD
+
+# Exclude the workflow to run on changes to the helm chart
 on:
   push:
-    branches: [main]
+    branches:
+      - main
     paths-ignore:
       - 'helm/**'
       - 'k8s/**'
       - 'README.md'
 
-env:
-  DOCKER_IMAGE: ${{ secrets.DOCKER_USERNAME }}/go-web-app  # 🐳 Docker Hub repo
-
 jobs:
-  build-test-publish:
+
+  build:
     runs-on: ubuntu-latest
-
-    # 🛡️ Prevent CI from looping when it updates helm/values.yaml
-    if: "!contains(github.event.head_commit.message, 'Update image tag to')"
-
     steps:
-    # 📂 Checkout code from GitHub
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
-    # 🧠 Set up Go environment
-    - name: Set up Go
-      uses: actions/setup-go@v4
+    - name: Set up Go 1.22
+      # Updated to the latest version of the setup-go action
+      uses: actions/setup-go@v5
       with:
-        go-version: '1.22.5'
+        go-version: 1.22
 
-    # 🔨 Build Go project
-    - name: Build Go app
-      run: go build -v ./...
+    - name: Build
+      run: go build -o go-web-app
 
-    # ✅ Run unit tests
-    - name: Run tests
-      run: go test -v ./...
-    - name: Login to Docker Hub
+    - name: Test
+      run: go test ./...
+
+  code-quality:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: v1.56.2
+
+  push:
+    runs-on: ubuntu-latest
+    needs: [build, code-quality] # It's good practice to wait for code quality checks too
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      # Updated to the latest version of the setup-buildx-action
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to DockerHub
       uses: docker/login-action@v3
       with:
-       username: ${{ secrets.DOCKER_USERNAME }}
-       password: ${{ secrets.DOCKER_PASSWORD }}
-# 🐳 Build & push Docker image using official action
-    - name: Build and push Docker image
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+    - name: Build and Push action
       uses: docker/build-push-action@v6
       with:
         context: .
         file: ./Dockerfile
         push: true
-        tags: ${{ secrets.DOCKER_USERNAME }}/go-web-app:${{ github.sha }}
+        tags: ${{ secrets.DOCKERHUB_USERNAME }}/go-web-app:${{github.run_id}}
 
-    # 📝 Update Helm values.yaml with new image tag and push back to GitHub
-    - name: Update Helm tag and commit
+  update-newtag-in-helm-chart:
+    runs-on: ubuntu-latest
+    needs: push
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        # Use a token with write permissions to push to the repository
+        token: ${{ secrets.GIT_TOKEN }}
+
+    - name: Update tag in Helm chart
       run: |
-        sed -i "s/^  tag: .*/  tag: \"${{ github.sha }}\"/" helm/values.yaml
-        git config user.name "ci-bot"
-        git config user.email "ci-bot@example.com"
-        git add helm/values.yaml
-        git commit -m "Update image tag to ${{ github.sha }}" || echo "No changes to commit"
-        git push
+        sed -i 's/tag: .*/tag: "${{github.run_id}}"/' helm/go-web-app-chart/values.yaml
 
-    
+    - name: Commit and push changes
+      run: |
+        git config --global user.email "xaqanik.1990@gmail.com"
+        git config --global user.name "Khanani Xaqani"
+        git add helm/go-web-app-chart/values.yaml
+        # ✅ FIXED: Added [skip ci] to the commit message to prevent workflow loops
+        git commit -m "Update image tag to ${{github.run_id}} [skip ci]"
+        git push
